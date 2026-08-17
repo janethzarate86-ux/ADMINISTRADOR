@@ -290,6 +290,8 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #mxAdminConnModal{position:fixed;inset:0;z-index:2147483600;background:rgba(2,10,22,.74);display:none;align-items:center;justify-content:center;padding:18px}#mxAdminConnModal.open{display:flex}#mxAdminConnModal .box{width:min(620px,96vw);background:#fff;color:#16324f;border-radius:18px;box-shadow:0 26px 80px rgba(0,0,0,.38);overflow:hidden}#mxAdminConnModal .head{padding:14px 16px;background:linear-gradient(135deg,#0f2742,#183b63);color:#fff;display:flex;justify-content:space-between;align-items:center}#mxAdminConnModal .body{padding:15px}.mx-admin-conn-grid{display:grid;grid-template-columns:135px 1fr;gap:8px;font-size:11px}.mx-admin-conn-grid b{color:#64748b}.mx-admin-conn-grid span{word-break:break-all}.mx-admin-conn-close{width:auto!important;padding:6px 9px!important;background:rgba(255,255,255,.14)!important;color:#fff!important;border:1px solid rgba(255,255,255,.25)!important}
 .mx-adj-security{display:grid;grid-template-columns:minmax(220px,1fr) minmax(220px,1fr) auto auto;gap:8px;align-items:end}.mx-adj-security input{min-height:40px}.mx-adj-security button{width:auto;min-height:40px}.mx-adj-sec-status{margin-top:10px;padding:9px 11px;border-radius:11px;background:#f8fafc;border:1px solid #cbd5e1;font-size:11px;font-weight:800;color:#475569}.mx-adj-sec-status.ok{background:#ecfdf5;border-color:#86efac;color:#166534}.mx-adj-sec-status.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
 @media(max-width:820px){.mx-net-system-grid{grid-template-columns:1fr}.mx-net-viewer{grid-template-columns:1fr 1fr}.mx-adj-security{grid-template-columns:1fr 1fr}.mx-adj-security button{width:100%}}@media(max-width:520px){.mx-net-systems{grid-template-columns:1fr}.mx-net-viewer{grid-template-columns:1fr}.mx-net-info{grid-template-columns:100px 1fr}.mx-adj-security{grid-template-columns:1fr}}
+
+.mx-net-linked{margin-top:6px;padding:6px 9px;border-radius:9px;background:#e0f2fe;color:#075985;font-size:10px;font-weight:900;display:inline-block}
 </style>
 
 
@@ -339,6 +341,7 @@ input,select,textarea{color:#102844!important;background:#fff!important;border-c
 <style>
 
 /* MACROXEL v1.0.00 · Control universal de nombres/descripciones largas */
+.panel.hidden.mx-longtext-expanded,.hidden.mx-longtext-expanded{display:none!important}
 .mx-longtext-collapsed{
   overflow-wrap:anywhere!important;
   word-break:normal!important;
@@ -394,13 +397,13 @@ input,select,textarea{color:#102844!important;background:#fff!important;border-c
 <section class="card section mx-acc-card is-collapsed" data-acc="conectividad" id="mxConnectivityCenter">
 <div class="mx-acc-head"><div class="title">🕸️ Centro de conectividad Macroxel</div><button type="button" class="mx-acc-toggle">Abrir</button></div>
 <div class="mx-acc-body">
-<div class="sub">Vista compacta por sistema. Aquí solo se muestran los <b>Sistemas Principales</b>; selecciona uno para abrir su información, rutas Firebase, rutas GitHub y visores asociados.</div>
+<div class="sub">Vista compacta multi-sistema. Selecciona una instalación para enlazar temporalmente el Administrador a su Firebase y controlar activaciones, permisos, usuarios, mensajes y conectividad sin cambiar los demás sistemas.</div>
 <div class="mx-net-center">
 <div class="mx-net-toolbar"><button id="mxNetRefresh" class="secondary" type="button">🔄 Actualizar</button><span id="mxNetStatus" class="mx-net-state">Inicializando…</span></div>
 <div id="mxNetSystems" class="mx-net-systems"><div class="mx-net-empty">Buscando Sistemas Principales…</div></div>
 <div id="mxNetSystemPanel" class="mx-net-system-panel" hidden>
   <div class="mx-net-system-head">
-    <div><span class="mx-net-eyebrow">SISTEMA SELECCIONADO</span><h4 id="mxNetSystemTitle">Sistema Principal</h4><div id="mxNetSystemState" class="mx-net-state"></div></div>
+    <div><span class="mx-net-eyebrow">SISTEMA SELECCIONADO</span><h4 id="mxNetSystemTitle">Sistema Principal</h4><div id="mxNetSystemState" class="mx-net-state"></div><div id="mxNetAdminLink" class="mx-net-linked"></div></div>
     <div class="mx-net-system-head-actions"><button id="mxNetToggleViewers" class="warn" type="button">🛠 Pausar visores</button><button id="mxNetTogglePrincipal" class="danger" type="button">🔌 Desconectar</button><button id="mxNetCloseSystem" class="secondary" type="button">Cerrar</button></div>
   </div>
   <div class="mx-net-system-grid">
@@ -603,26 +606,25 @@ input,select,textarea{color:#102844!important;background:#fff!important;border-c
     }
 
     function normalizeDbUrl(url){ return String(url||'').trim().replace(/\/+$/g,''); }
-    function getDbUrl(){ try{ const v=normalizeDbUrl(localStorage.getItem(LS_DB_KEY)||''); return v; }catch(e){ return ''; } }
-    function setDbUrl(url){
-      let clean = normalizeDbUrl(url);
-      
-      try{
-        if(clean) localStorage.setItem(LS_DB_KEY, clean);
-        else localStorage.removeItem(LS_DB_KEY);
-      }catch(e){}
-      paintDbState(clean);
-      return clean;
-    }
-    function getBranch(){ try{ const b=String(localStorage.getItem(LS_BRANCH_KEY)||'HGAM').trim().toUpperCase()||'HGAM'; if(b==='SISTEMA DE INVENTARIO PRUEBAS'){localStorage.setItem(LS_BRANCH_KEY,'HGAM');return 'HGAM';} return b; }catch(e){ return 'HGAM'; } }
+    const ADMIN_TARGET_KEY='mx_admin_target_system_v1';
+    function getOwnDbUrl(){ try{ return normalizeDbUrl(localStorage.getItem(LS_DB_KEY)||''); }catch(e){ return ''; } }
+    function getOwnBranch(){ try{ const b=String(localStorage.getItem(LS_BRANCH_KEY)||'HGAM').trim().toUpperCase()||'HGAM'; if(b==='SISTEMA DE INVENTARIO PRUEBAS'){localStorage.setItem(LS_BRANCH_KEY,'HGAM');return 'HGAM';} return b; }catch(e){ return 'HGAM'; } }
+    function readAdminTarget(){try{const r=JSON.parse(localStorage.getItem(ADMIN_TARGET_KEY)||'null');const db=normalizeDbUrl(r?.db||r?.firebaseUrl||''),branch=String(r?.branch||r?.unitId||'').trim().toUpperCase();return db&&branch?{...r,db,branch}:null}catch(_e){return null}}
+    function setAdminTarget(ctx){const db=normalizeDbUrl(ctx?.db||ctx?.firebaseUrl||''),branch=String(ctx?.branch||ctx?.unitId||'').trim().toUpperCase();if(!db||!branch)return null;const next={db,branch,unitName:String(ctx?.unitName||ctx?.principalName||branch).trim(),selectedAt:new Date().toISOString(),mode:'ADMIN_TEMPORARY_TARGET'};try{localStorage.setItem(ADMIN_TARGET_KEY,JSON.stringify(next))}catch(_e){};window.dispatchEvent(new CustomEvent('mx-admin-target-changed',{detail:next}));return next}
+    function clearAdminTarget(){let previous=readAdminTarget();try{localStorage.removeItem(ADMIN_TARGET_KEY)}catch(_e){};window.dispatchEvent(new CustomEvent('mx-admin-target-changed',{detail:null,previous}));}
+    function getDbUrl(){ const t=readAdminTarget(); return t?.db||getOwnDbUrl(); }
+    function getBranch(){ const t=readAdminTarget(); return t?.branch||getOwnBranch(); }
+    window.mxAdminTargetCfg=readAdminTarget;window.mxAdminSetTarget=setAdminTarget;window.mxAdminClearTarget=clearAdminTarget;
+    function setDbUrl(url){let clean=normalizeDbUrl(url);try{if(clean)localStorage.setItem(LS_DB_KEY,clean);else localStorage.removeItem(LS_DB_KEY);}catch(e){}paintDbState(clean);return clean;}
     function setBranch(v){ const b=String(v||'HGAM').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,80)||'HGAM'; try{localStorage.setItem(LS_BRANCH_KEY,b);}catch(e){} const el=qs('#branchInput'); if(el)el.value=b; return b; }
-    window.mxViewerGetCfg=()=>({db:getDbUrl(),branch:getBranch()});
-    window.mxViewerSaveCfg=(next,notify=false)=>{const previous={db:getDbUrl(),branch:getBranch()},saved={db:setDbUrl(next?.db??previous.db),branch:setBranch(next?.branch??previous.branch)};if(notify)window.dispatchEvent(new CustomEvent('mx-viewer-config-changed',{detail:{previous,next:saved}}));return saved;};
+    /* La licencia/conexión propia del Administrador permanece estable. Los módulos operativos usan el sistema seleccionado. */
+    window.mxViewerGetCfg=()=>({db:getOwnDbUrl(),branch:getOwnBranch()});
+    window.mxViewerSaveCfg=(next,notify=false)=>{const previous={db:getOwnDbUrl(),branch:getOwnBranch()},saved={db:setDbUrl(next?.db??previous.db),branch:setBranch(next?.branch??previous.branch)};if(notify)window.dispatchEvent(new CustomEvent('mx-viewer-config-changed',{detail:{previous,next:saved}}));return saved;};
     function paintDbState(url){
       const clean = normalizeDbUrl(url||'');
-      qs('#dbBadge').textContent = clean ? `${getBranch()} · Firebase configurado` : 'Sin liga configurada';
+      qs('#dbBadge').textContent = clean ? `${getOwnBranch()} · Firebase configurado` : 'Sin liga configurada';
       qs('#dbUrlInput').value = clean;
-      if(qs('#branchInput')) qs('#branchInput').value=getBranch();
+      if(qs('#branchInput')) qs('#branchInput').value=getOwnBranch();
     }
 
     async function dbGet(path){
@@ -720,7 +722,7 @@ input,select,textarea{color:#102844!important;background:#fff!important;border-c
           dbGet(PATHS.heartbeat).catch(()=>({})),
           readBranchMap(PATHS.perms),
           readBranchMap(PATHS.users),
-          dbGet(PATHS.msgAck).catch(()=>null),
+          dbGet(PATHS.msgAck + '/' + encodeURIComponent(getBranch())).catch(()=>dbGet(PATHS.msgAck).catch(()=>null)),
           dbGet(PATHS.backupResult).catch(()=>null)
         ]);
         const active=normalizeHeartbeatUsers(activeRaw,getBranch());
@@ -867,11 +869,12 @@ input,select,textarea{color:#102844!important;background:#fff!important;border-c
       try{
         const now = new Date();
         const dayKey = [now.getFullYear(), String(now.getMonth()+1).padStart(2,'0'), String(now.getDate()).padStart(2,'0')].join('-');
-        await dbPut(PATHS.msgOut, {
+        await dbPut(PATHS.msgOut + '/' + encodeURIComponent(getBranch()), {
           token: gate.token,
           text: cleanText,
           targetUser:targetUser || null,
           messageType:'voice_text',
+          targetSystemId:getBranch(),
           sentAt:now.toISOString(),
           sentTs:Date.now(),
           dayKey,
@@ -897,6 +900,7 @@ input,select,textarea{color:#102844!important;background:#fff!important;border-c
       qs('#userInput').addEventListener('change', ()=> loadPerms({ silentEmpty:true }));
       qs('#userInput').addEventListener('blur', ()=>{ if(norm(qs('#userInput').value)) loadPerms({ silentEmpty:true }); });
       qs('#sendMsgBtn').addEventListener('click', sendMessage);
+      window.addEventListener('mx-admin-target-changed',()=>{setTimeout(()=>refreshPanel(),80)});
     }
 
 
@@ -951,8 +955,8 @@ input,select,textarea{color:#102844!important;background:#fff!important;border-c
 
     function init(){
       renderPermChecks();
-      setBranch(getBranch());
-      paintDbState(getDbUrl());
+      setBranch(getOwnBranch());
+      paintDbState(getOwnDbUrl());
       bind();
       setupAccordion();
       if(getDbUrl()) refreshPanel();
@@ -1016,7 +1020,7 @@ function render(){const q=txt($('vlaSearch')?.value).toLowerCase(),f=$('vlaFilte
 async function action(id,act,appCode){const row=rows.find(r=>r.__id===id);if(!row)return;const path=`/viewer_licenses/${encodeURIComponent(getBranch())}/${encodeURIComponent(id)}`,now=new Date(),iso=now.toISOString(),all=apps(row);if(act==='delete'){if(!confirm('¿Eliminar completamente este registro de activación?\n\nSe borrarán los datos registrados de este dispositivo. El usuario deberá capturar nuevamente sus datos y enviar una solicitud nueva.'))return;await publishResetAdmin(row,id);await hardDeleteIdentityAdmin(row,id).catch(()=>false);await dbPut(path,null);rows=rows.filter(x=>x.__id!==id);render();setVla('✅ Registro eliminado completamente. El usuario ya puede corregir sus datos y solicitar acceso nuevamente.','ok');return}if(act==='suspend'){if(!confirm('¿Suspender el acceso de este dispositivo?\n\nNo se reactivará automáticamente; requerirá autorización manual.'))return;Object.assign(row,{active:false,status:'suspended',suspendedAt:iso,suspendedBy:'MACROXEL_ADMINISTRADOR',manualValidationRequired:true,identityAutoLinkBlocked:true,identityAccessInherited:false,updatedAt:iso,updatedBy:'MACROXEL_ADMINISTRADOR'});for(const c of Object.keys(all))all[c]={...all[c],manualValidationRequired:true,autoLinkBlocked:true};row.applications=all;}else if(act==='revoke'){const c=code(appCode);if(!confirm(`¿Quitar el acceso a ${label(c)}?
 
 Ese visor quedará bloqueado para reactivación automática y necesitará validación manual.`))return;if(all[c])all[c]={...all[c],active:false,status:'suspended',manualValidationRequired:true,autoLinkBlocked:true,revokedAt:iso,revokedBy:'MACROXEL_ADMINISTRADOR'};row.applications=all;row.identityAccessInherited=false;row.updatedAt=iso;}else{const plan=normalizePlanCode(document.querySelector(`[data-plan="${CSS.escape(id)}"]`)?.value||planCodeOf(row));if(act==='grant'||act==='activate'){const c=code(appCode||document.querySelector(`[data-app-select="${CSS.escape(id)}"]`)?.value||pending(row)[0]?.appCode),a=all[c]||{appCode:c,appName:label(c)};all[c]={...a,active:true,status:'active',manualValidationRequired:false,autoLinkBlocked:false,manualReauthorizedAt:iso,approvedAt:iso,approvedBy:'MACROXEL_ADMINISTRADOR'};row.applications=all;row.manualValidationRequired=false;row.identityAutoLinkBlocked=false;row.identityAccessInherited=false;row.deletedAt='';row.suspendedAt='';}const current=Date.parse(row.expiresAt||''),start=current>Date.now()?new Date(current):now,expires=addMonths(start,planMonths(plan));Object.assign(row,{active:true,status:'active',planCode:plan,plan:planLabel(plan),durationMonths:planMonths(plan),licenseMonths:planMonths(plan),activatedAt:row.activatedAt||iso,lastActivatedAt:iso,expiresAt:expires.toISOString(),updatedAt:iso,updatedBy:'MACROXEL_ADMINISTRADOR',branch:getBranch()})}const next={...row};delete next.__id;await dbPut(path,next);if(act==='grant'||act==='activate')await syncIdentityAccess(row,id,'grant',appCode||document.querySelector(`[data-app-select="${CSS.escape(id)}"]`)?.value).catch(()=>false);if(act==='grant'||act==='activate')await clearResetAdmin(row,id).catch(()=>false);else if(act==='renew')await syncIdentityAccess(row,id,'renew').catch(()=>false);else if(act==='revoke')await syncIdentityAccess(row,id,'revoke',appCode).catch(()=>false);else if(act==='suspend')await syncIdentityAccess(row,id,'suspend').catch(()=>false);await refresh();setVla(act==='grant'||act==='activate'?'✅ Acceso autorizado manualmente y sincronizado con la identidad.':act==='renew'?`✅ Vigencia ampliada y guardada: ${planLabel(planCodeOf(row))} · vence ${fmt(row.expiresAt)}.`:'✅ Cambio guardado. La reactivación automática quedó bloqueada.','ok')}
-function bindAct(){const body=$('vlaBody');if(!body)return;$('vlaRefresh').onclick=refresh;$('vlaSearch').oninput=render;$('vlaFilter').onchange=render;body.onclick=e=>{const b=e.target.closest('[data-action]');if(b)action(b.dataset.id,b.dataset.action,b.dataset.app||document.querySelector(`[data-app-select="${CSS.escape(b.dataset.id||'')}"]`)?.value).catch(err=>setVla(err.message||String(err),'bad'))};document.querySelector('[data-acc="activaciones"] .mx-acc-head')?.addEventListener('click',()=>setTimeout(()=>{if(!document.querySelector('[data-acc="activaciones"]').classList.contains('is-collapsed'))refresh()},100))}
+function bindAct(){const body=$('vlaBody');if(!body)return;window.addEventListener('mx-admin-target-changed',()=>setTimeout(refresh,100));$('vlaRefresh').onclick=refresh;$('vlaSearch').oninput=render;$('vlaFilter').onchange=render;body.onclick=e=>{const b=e.target.closest('[data-action]');if(b)action(b.dataset.id,b.dataset.action,b.dataset.app||document.querySelector(`[data-app-select="${CSS.escape(b.dataset.id||'')}"]`)?.value).catch(err=>setVla(err.message||String(err),'bad'))};document.querySelector('[data-acc="activaciones"] .mx-acc-head')?.addEventListener('click',()=>setTimeout(()=>{if(!document.querySelector('[data-acc="activaciones"]').classList.contains('is-collapsed'))refresh()},100))}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindAct,{once:true});else bindAct();
 })();
 </script>
@@ -1041,7 +1045,7 @@ function render(){const body=$('mxIdBody');if(!body)return;const q=txt($('mxIdSe
 function renderDevices(i){const devs=Object.values(i?.devices||{}).sort((a,b)=>String(b.lastSeenAt||'').localeCompare(String(a.lastSeenAt||'')));return devs.length?devs.map(d=>`<div class="mx-id-device"><div><b>${esc(d.deviceId||'Dispositivo')}</b><small>${esc(d.platform||'')}</small></div><div>${deviceApps(d)}</div><div><small>Última señal</small><b>${fmt(d.lastSeenAt)}</b></div></div>`).join(''):'<div class="mx-id-muted">Sin dispositivos vinculados.</div>'}
 function renderReviews(){const host=$('mxIdReviews');if(!host)return;const items=Object.entries(licenses||{}).filter(([,r])=>r?.identityReviewRequired&&r?.identityCandidateUserId);host.innerHTML=items.length?`<div class="mx-id-review-title">⚠ Coincidencias que requieren revisión (${items.length})</div>${items.map(([deviceKey,r])=>{const cand=identities?.[r.identityCandidateUserId];return`<div class="mx-id-review"><div><b>${esc(r.fullName||r.name||r.nombre||'—')}</b><small>${esc(r.phone||r.telefono||'—')} · ${esc(r.email||r.correo||'—')}</small><small>Dispositivo: ${esc(r.deviceId||deviceKey)}</small></div><div><small>Posible identidad</small><b>${esc(cand?.fullName||r.identityCandidateUserId)}</b><small>${esc(r.identityCandidateUserId)} · ${Number(r.identityCandidateScore||0)}% coincidencia</small></div><button type="button" data-id-link="${esc(deviceKey)}" data-user="${esc(r.identityCandidateUserId)}">Vincular</button></div>`}).join('')}`:''}
 async function linkCandidate(deviceKey,userId){const api=await waitApi(),rec=licenses?.[deviceKey],identity=identities?.[userId];if(!rec||!identity)return;const m=api.matchPerson(rec,identity);if(m.score<60)return alert('La coincidencia ya no es suficiente para vincular automáticamente. Actualiza y revisa los datos.');if(!confirm(`¿Vincular este dispositivo a ${identity.fullName||userId}?\n\nCoincidencia: ${m.score}%\nUSER_ID: ${userId}`))return;const c=api.config(),now=new Date().toISOString();await api.patch(`viewer_licenses/${encodeURIComponent(c.branch)}/${encodeURIComponent(deviceKey)}`,{userId,identityLinkedAt:now,identityConfidence:'manual_review',identityScore:m.score,identityReviewRequired:false,identityCandidateUserId:null,identityCandidateScore:null,identityLinkedBy:'MACROXEL_ADMINISTRADOR'});await api.audit?.('IDENTITY_MANUAL_LINK',{userId,deviceId:rec.deviceId||deviceKey,score:m.score,linkedBy:'MACROXEL_ADMINISTRADOR'});await refresh(true)}
-function bind(){const body=$('mxIdBody'),reviews=$('mxIdReviews');$('mxIdRefresh')?.addEventListener('click',()=>refresh(true));$('mxIdSearch')?.addEventListener('input',render);$('mxIdFilter')?.addEventListener('change',render);body?.addEventListener('click',e=>{const b=e.target.closest('[data-id-view]');if(!b)return;const row=document.querySelector(`[data-id-detail="${CSS.escape(b.dataset.idView)}"]`);if(row){row.hidden=!row.hidden;b.textContent=row.hidden?'Ver dispositivos':'Ocultar'}});reviews?.addEventListener('click',e=>{const b=e.target.closest('[data-id-link]');if(b)linkCandidate(b.dataset.idLink,b.dataset.user).catch(err=>alert(err.message||String(err)))});document.getElementById('vlaRefresh')?.addEventListener('click',()=>setTimeout(()=>refresh(true),900));document.getElementById('vlaBody')?.addEventListener('click',e=>{if(e.target.closest('[data-action]'))setTimeout(()=>refresh(true),1200)});document.querySelector('[data-acc="activaciones"] .mx-acc-head')?.addEventListener('click',()=>setTimeout(()=>{if(!document.querySelector('[data-acc="activaciones"]')?.classList.contains('is-collapsed'))refresh(true)},250));setTimeout(()=>refresh(true),1800);setInterval(()=>{if(document.visibilityState==='visible')refresh(false)},300000)}
+function bind(){const body=$('mxIdBody'),reviews=$('mxIdReviews');window.addEventListener('mx-admin-target-changed',()=>setTimeout(()=>refresh(true),150));$('mxIdRefresh')?.addEventListener('click',()=>refresh(true));$('mxIdSearch')?.addEventListener('input',render);$('mxIdFilter')?.addEventListener('change',render);body?.addEventListener('click',e=>{const b=e.target.closest('[data-id-view]');if(!b)return;const row=document.querySelector(`[data-id-detail="${CSS.escape(b.dataset.idView)}"]`);if(row){row.hidden=!row.hidden;b.textContent=row.hidden?'Ver dispositivos':'Ocultar'}});reviews?.addEventListener('click',e=>{const b=e.target.closest('[data-id-link]');if(b)linkCandidate(b.dataset.idLink,b.dataset.user).catch(err=>alert(err.message||String(err)))});document.getElementById('vlaRefresh')?.addEventListener('click',()=>setTimeout(()=>refresh(true),900));document.getElementById('vlaBody')?.addEventListener('click',e=>{if(e.target.closest('[data-action]'))setTimeout(()=>refresh(true),1200)});document.querySelector('[data-acc="activaciones"] .mx-acc-head')?.addEventListener('click',()=>setTimeout(()=>{if(!document.querySelector('[data-acc="activaciones"]')?.classList.contains('is-collapsed'))refresh(true)},250));setTimeout(()=>refresh(true),1800);setInterval(()=>{if(document.visibilityState==='visible')refresh(false)},300000)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
 })();
 
@@ -1372,7 +1376,7 @@ function matchPerson(input,existing){const a=canonicalPerson(input),b=canonicalP
   let conflict=false;if(phone&&email&&a.nameKey&&b.nameKey&&name<.35){score=Math.min(score,88);conflict=true;reasons.push('nombre no coincide')}
   if(score>100)score=100;const level=!conflict&&score>=90?'high':score>=60?'review':'low';return{score,level,conflict,reasons,nameSimilarity:name,phoneMatch:phone,emailMatch:email,nameExact}}
 function indexKeys(v={}){const p=canonicalPerson(v),out=[];if(p.phoneKey)out.push('P_'+hash(p.phoneKey));if(p.emailKey)out.push('E_'+hash(p.emailKey));if(p.nameKey)out.push('N_'+hash(p.nameKey));return out}
-function config(){let db='',branch='';try{const c=window.mxViewerGetCfg?.();db=cleanDb(c?.db||c?.firebaseUrl||c?.currentUrl||c?.url);branch=cleanBranch(c?.branch||c?.unitId||c?.activationId||c?.storeId)}catch(_e){}
+function config(){let db='',branch='';try{const c=window.mxAdminTargetCfg?.()||window.mxViewerGetCfg?.();db=cleanDb(c?.db||c?.firebaseUrl||c?.currentUrl||c?.url);branch=cleanBranch(c?.branch||c?.unitId||c?.activationId||c?.storeId)}catch(_e){}
   for(const k of CONFIG_KEYS){const c=safeJson(localStorage.getItem(k));if(!c)continue;if(!db)db=cleanDb(c.db||c.firebaseUrl||c.currentUrl||c.url);if(!branch)branch=cleanBranch(c.branch||c.unitId||c.activationId||c.storeId||c.sucursal)}
   if(!db)db=cleanDb(localStorage.getItem('mx_fv_db_v2')||localStorage.getItem('mx_visor_inventarios_db_url_v1'));if(!branch)branch=cleanBranch(localStorage.getItem('mx_fv_branch_v1')||localStorage.getItem('mx_visor_inventarios_branch_v1'));for(const id of ['mxVaDb','viewerDb','setDb','dbUrlInput']){const e=document.getElementById(id);if(!db&&e)db=cleanDb(e.value)}for(const id of ['mxVaBranch','viewerBranch','setBranch','branchInput']){const e=document.getElementById(id);if(!branch&&e)branch=cleanBranch(e.value)}return{db,branch}}
 function url(path){const c=config();return c.db?c.db+'/'+String(path||'').replace(/^\/+/, '')+'.json':''}
@@ -1467,24 +1471,23 @@ function online(r){const t=Number(r?.lastSeenMs)||Date.parse(r?.lastSeenAt||0)||
 function recent(r){const t=Number(r?.lastSeenMs)||Date.parse(r?.lastSeenAt||0)||0;return!!t&&now()-t<RECENT_MS}
 function branchOf(r){return txt(r?.branch||r?.unitId||'SIN_UNIDAD').toUpperCase()||'SIN_UNIDAD'}
 function unitNameOf(r){return txt(r?.unitName||r?.principalName||r?.branch||'Sistema Principal')}
-let principals=[],viewers=[],controls={},meta={},audit=[],selectedBranch='';
+let principals=[],viewers=[],controls={},meta={},audit=[],registry={},selectedBranch=window.mxAdminTargetCfg?.()?.branch||'';
 function ctl(d){return controls?.[d?.key]||{}}
 function paused(d){return ctl(d)?.paused===true||d?.connectionPaused===true}
 function principalRemotePaused(d){return ctl(d)?.paused===true}
 function alias(d){return txt(meta?.[d?.key]?.alias||d?.alias||d?.unitName||d?.principalName||appLabel(d?.appCode)||d?.key)}
 function systems(){
   const map=new Map();
-  for(const p of principals){
-    const br=branchOf(p),g=map.get(br)||{branch:br,principals:[],viewers:[]};
-    g.principals.push(p);map.set(br,g);
+  for(const [key,r] of Object.entries(registry||{})){
+    if(!r||typeof r!=='object'||!txt(r.firebaseUrl||r.currentUrl||r.db||r.url)||!txt(r.unitId||r.activationId||r.branch))continue;
+    const br=branchOf(r),g=map.get(br)||{branch:br,principals:[],viewers:[],registry:[]};g.registry.push({key,kind:'registry',...r});map.set(br,g);
   }
-  for(const v of viewers){
-    const br=branchOf(v),g=map.get(br);
-    if(g)g.viewers.push(v);
-  }
-  return [...map.values()].sort((a,b)=>String((a.principals[0]?.unitName||a.branch)).localeCompare(String((b.principals[0]?.unitName||b.branch)),'es'));
+  for(const p of principals){const br=branchOf(p),g=map.get(br)||{branch:br,principals:[],viewers:[],registry:[]};g.principals.push(p);map.set(br,g);}
+  for(const v of viewers){const br=branchOf(v),g=map.get(br);if(g)g.viewers.push(v);}
+  return [...map.values()].sort((a,b)=>String((primary(a)?.unitName||a.branch)).localeCompare(String((primary(b)?.unitName||b.branch)),'es'));
 }
-function primary(g){return [...(g?.principals||[])].sort((a,b)=>(Number(b.lastSeenMs)||Date.parse(b.lastSeenAt||0)||0)-(Number(a.lastSeenMs)||Date.parse(a.lastSeenAt||0)||0))[0]||null}
+function primary(g){const live=[...(g?.principals||[])].sort((a,b)=>(Number(b.lastSeenMs)||Date.parse(b.lastSeenAt||0)||0)-(Number(a.lastSeenMs)||Date.parse(a.lastSeenAt||0)||0))[0];if(live)return live;return [...(g?.registry||[])].sort((a,b)=>(Date.parse(b.updatedAt||0)||0)-(Date.parse(a.updatedAt||0)||0))[0]||null}
+function linkAdminToGroup(g){const p=primary(g),db=clean(p?.firebaseUrl||p?.currentUrl||p?.db||p?.url);if(!db)return null;return window.mxAdminSetTarget?.({db,branch:g.branch,unitName:p?.unitName||p?.principalName||g.branch})||null}
 function viewerGroups(g){
   const map=new Map();
   for(const d of g?.viewers||[]){
@@ -1517,14 +1520,15 @@ function firebaseRoutesFor(g){
 async function load(){
   const st=document.getElementById('mxNetStatus');if(st){st.textContent='Actualizando…';st.className='mx-net-state'}
   try{
-    const[vp,pp,ct,mt,au]=await Promise.all([
+    const[vp,pp,ct,mt,au,rg]=await Promise.all([
       get('/inventory_heartbeat/visor_presence').catch(()=>({})),
       get('/inventory_heartbeat/principal_presence').catch(()=>({})),
       get('/ecosystem_connection/device_control').catch(()=>({})),
       get('/ecosystem_connection/device_meta').catch(()=>({})),
-      get('/ecosystem_connection/control_audit').catch(()=>({}))
+      get('/ecosystem_connection/control_audit').catch(()=>({})),
+      get('/ecosystem_connection').catch(()=>({}))
     ]);
-    controls=ct||{};meta=mt||{};
+    controls=ct||{};meta=mt||{};registry=rg||{};
     principals=Object.entries(pp||{}).filter(([,v])=>v&&recent(v)).map(([key,v])=>({key,kind:'principal',...v}));
     viewers=Object.entries(vp||{}).filter(([,v])=>v&&recent(v)).map(([key,v])=>({key,kind:'viewer',...v}));
     audit=Object.entries(au||{}).map(([k,v])=>({__key:k,...(v||{})})).sort((a,b)=>(Number(b.ts)||Date.parse(b.at||0)||0)-(Number(a.ts)||Date.parse(a.at||0)||0)).slice(0,60);
@@ -1537,8 +1541,8 @@ async function load(){
 function render(){
   const host=document.getElementById('mxNetSystems');if(!host)return;
   const ss=systems();
-  host.innerHTML=ss.length?ss.map(g=>{const p=primary(g),on=(g.principals||[]).some(online),pa=(g.principals||[]).every(principalRemotePaused),vg=viewerGroups(g),active=g.branch===selectedBranch;return `<button type="button" class="mx-net-system-btn ${active?'active':''}" data-mx-system="${esc(g.branch)}"><b><span class="dot ${pa?'pause':on?'on':''}"></span>${esc(p?.unitName||p?.principalName||g.branch)}</b><small>ID: ${esc(g.branch)} · ${pa?'Firebase desconectado':on?'En línea':'Sin señal reciente'} · ${vg.length} visor(es)</small></button>`}).join(''):'<div class="mx-net-empty">No hay Sistemas Principales con señal reciente.</div>';
-  host.querySelectorAll('[data-mx-system]').forEach(b=>b.onclick=()=>{selectedBranch=b.dataset.mxSystem;render();renderSystem()});
+  host.innerHTML=ss.length?ss.map(g=>{const p=primary(g),on=(g.principals||[]).some(online),pa=(g.principals||[]).length>0&&(g.principals||[]).every(principalRemotePaused),vg=viewerGroups(g),active=g.branch===selectedBranch;return `<button type="button" class="mx-net-system-btn ${active?'active':''}" data-mx-system="${esc(g.branch)}"><b><span class="dot ${pa?'pause':on?'on':''}"></span>${esc(p?.unitName||p?.principalName||g.branch)}</b><small>ID: ${esc(g.branch)} · ${pa?'Firebase desconectado':on?'En línea':'Sin señal reciente'} · ${vg.length} visor(es)</small></button>`}).join(''):'<div class="mx-net-empty">No hay Sistemas Principales con señal reciente.</div>';
+  host.querySelectorAll('[data-mx-system]').forEach(b=>b.onclick=()=>{selectedBranch=b.dataset.mxSystem;const g=systems().find(x=>x.branch===selectedBranch);if(g)linkAdminToGroup(g);render();renderSystem()});
   renderSystem()
 }
 function renderSystem(){
@@ -1549,6 +1553,7 @@ function renderSystem(){
   const p=primary(g),ps=g.principals||[],on=ps.some(online),pa=ps.length&&ps.every(principalRemotePaused),vgs=viewerGroups(g),allViewerMembers=g.viewers||[],allPaused=allViewerMembers.length&&allViewerMembers.every(paused);
   document.getElementById('mxNetSystemTitle').textContent=p?.unitName||p?.principalName||g.branch;
   const sysState=document.getElementById('mxNetSystemState');const localOff=!pa&&p?.connectionPaused===true;sysState.textContent=`${pa?'🔴 Firebase desconectado desde Administrador':localOff?'🔴 Firebase desconectado localmente':on?'🟢 Sistema en línea':'⚪ Sin señal reciente'} · ID ${g.branch}`;sysState.className='mx-net-state '+((pa||localOff)?'bad':on?'ok':'warn');
+  const linked=document.getElementById('mxNetAdminLink');if(linked)linked.textContent=`🔗 Administrador enlazado a ${p?.unitName||p?.principalName||g.branch}. Activaciones, permisos, usuarios y mensajes usarán esta conexión.`;
   const info=document.getElementById('mxNetPrincipalInfo');
   info.innerHTML=`<b>Unidad</b><span>${esc(p?.unitName||p?.principalName||'—')}</span><b>ID sistema</b><span>${esc(g.branch)}</span><b>Estado</b><span>${pa?'🔴 Desconectado desde Administrador':localOff?'🔴 Desconectado localmente':on?'🟢 Conectado':'⚪ Sin señal'}</span><b>Versión</b><span>${esc(p?.controlVersion||p?.viewerVersion||'—')}</span><b>Última señal</b><span>${esc(fmt(p?.lastSeenAt||p?.lastSeenMs))}</span><b>Tipo</b><span>${esc(p?.deviceType||'Windows')}</span>`;
   const fbs=firebaseRoutesFor(g),gh=routeMapFor(g);
@@ -1603,7 +1608,7 @@ async function togglePrincipalSelected(){
     setTimeout(load,900);
   }catch(e){alert('No se pudo '+(disconnect?'desconectar':'reconectar')+' el Sistema Principal: '+(e?.message||e))}
 }
-function closeSystem(){selectedBranch='';const p=document.getElementById('mxNetSystemPanel');if(p)p.hidden=true;render()}
+function closeSystem(){selectedBranch='';window.mxAdminClearTarget?.();const p=document.getElementById('mxNetSystemPanel');if(p)p.hidden=true;render()}
 function installLogo(){const logo=document.getElementById('mxAdminLogo');if(!logo||logo.dataset.mxConnV124==='1')return;logo.dataset.mxConnV124='1';logo.style.cursor='pointer';logo.title='Ver conexión técnica del Administrador';logo.addEventListener('click',async e=>{e.preventDefault();e.stopImmediatePropagation();let m=document.getElementById('mxAdminConnModal');if(!m){m=document.createElement('div');m.id='mxAdminConnModal';m.innerHTML='<div class="box"><div class="head"><b>Administrador · Información de conexión</b><button class="mx-admin-conn-close" type="button">Cerrar</button></div><div class="body"><div id="mxAdminConnInfo" class="mx-admin-conn-grid"></div></div></div>';document.body.appendChild(m);m.querySelector('.mx-admin-conn-close').onclick=()=>m.classList.remove('open');m.onclick=x=>{if(x.target===m)m.classList.remove('open')}}const c=window.mxViewerGetCfg?.()||{},db=clean(c.db||c.firebaseUrl||c.currentUrl||c.url),br=txt(c.branch||c.unitId||'HGAM').toUpperCase();m.querySelector('#mxAdminConnInfo').innerHTML=`<b>Estado</b><span>${navigator.onLine?'🟢 Navegador en línea':'🔴 Sin Internet'}${window.mxMaintenancePaused?.()?' · Mantenimiento':''}</span><b>URL Firebase</b><span>${esc(db||'Sin URL')}</span><b>Visor</b><span>MACROXEL Administrador</span><b>URL GitHub</b><span>${esc(window.mxViewerGitHubUrl?.()||location.href.split(/[?#]/)[0])}</span><b>Unidad</b><span>${esc(br)}</span>`;m.classList.add('open')},true)}
 function bind(){
   installLogo();
@@ -1767,7 +1772,16 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   function candidateText(el){return String(el?.textContent||'').replace(/\s+/g,' ').trim()}
   function isLikelyProductElement(el){
     if(!el||badTags.has(el.tagName))return false;
-    if(el.matches?.(selector))return true;
+    const structural=new Set(['HTML','BODY','SECTION','MAIN','NAV','HEADER','FOOTER','FORM','TABLE','TBODY','THEAD','TFOOT','TR','UL','OL','ARTICLE']);
+    if(structural.has(el.tagName))return false;
+    const meta=((el.id||'')+' '+(typeof el.className==='string'?el.className:'')).toLowerCase();
+    if(/(?:^|[\s_-])(productividad|productivity)(?:$|[\s_-])/.test(meta))return false;
+    if(el.classList?.contains('panel')||el.classList?.contains('view'))return false;
+    if(el.matches?.(selector)){
+      /* Nunca comprimir una tarjeta/módulo completo: solo el nodo que realmente contiene el nombre. */
+      if(el.children.length>0 && el.tagName!=='TD' && el.tagName!=='OPTION')return false;
+      return true;
+    }
     if(el.tagName==='TD' && el.children.length===0){
       const t=candidateText(el);return words(t).length>36 && /(?:MG|ML|TABLETA|CAPSULA|SOLUCION|SOLUCIÓN|ENVASE|FRASCO|AMPOLLETA|JARABE|POLVO|CREMA|GEL|BOLSA|CAJA)/i.test(t);
     }
