@@ -404,7 +404,7 @@ input,select,textarea{color:#102844!important;background:#fff!important;border-c
 <div id="mxNetSystemPanel" class="mx-net-system-panel" hidden>
   <div class="mx-net-system-head">
     <div><span class="mx-net-eyebrow">SISTEMA SELECCIONADO</span><h4 id="mxNetSystemTitle">Sistema Principal</h4><div id="mxNetSystemState" class="mx-net-state"></div><div id="mxNetAdminLink" class="mx-net-linked"></div></div>
-    <div class="mx-net-system-head-actions"><button id="mxNetToggleViewers" class="warn" type="button">🛠 Pausar visores</button><button id="mxNetTogglePrincipal" class="danger" type="button">🔌 Desconectar</button><button id="mxNetCloseSystem" class="secondary" type="button">Cerrar</button></div>
+    <div class="mx-net-system-head-actions"><button id="mxNetToggleViewers" class="warn" type="button">🛠 Pausar visores</button><button id="mxNetTogglePrincipal" class="danger" type="button">🔌 Desconectar</button><button id="mxNetDeleteSystem" class="danger" type="button">🗑 Eliminar sistema</button><button id="mxNetCloseSystem" class="secondary" type="button">Cerrar</button></div>
   </div>
   <div class="mx-net-system-grid">
     <div class="mx-net-panel"><h4>Información del Sistema Principal</h4><div id="mxNetPrincipalInfo" class="mx-net-info"></div></div>
@@ -859,7 +859,7 @@ input,select,textarea{color:#102844!important;background:#fff!important;border-c
 
       const targetUser = '';
       const cleanText = mxStableText(text);
-      const signature = [cleanText.toLowerCase(), 'SISTEMA_PRINCIPAL'].join('|');
+      const signature = [cleanText.toLowerCase(), 'SISTEMA_PRINCIPAL', getBranch()].join('|');
       const gate = mxCanSend('msg', signature);
       if(!gate.ok){
         mxReleaseLock('msg');
@@ -1088,7 +1088,7 @@ function field(ids){for(const id of ids){const e=document.getElementById(id);con
 function statusHost(){for(const id of ['activationMsg','actMsg','mxVaState','mxVaMsg','activationState']){const e=document.getElementById(id);if(e)return e}return null}
 function controlUrl(path){return CONTROL_DB+'/'+String(path||'').replace(/^\/+/, '')+'.json'}
 async function controlGet(path){const r=await priorFetch(controlUrl(path)+'?ts='+Date.now(),{cache:'no-store'});if(!r.ok)return null;return r.json().catch(()=>null)}
-async function discover(){const c=cfg(),rec=await controlGet('ecosystem_connection/latest').catch(()=>null);if(rec){return{branch:txt(rec?.unitId||rec?.activationId||rec?.branch||c.branch||'HGAM').toUpperCase(),db:cleanDb(rec?.firebaseUrl||rec?.currentUrl||rec?.db||rec?.url||c.db),unitName:txt(rec?.unitName||rec?.unidad||rec?.principalName)}}return{branch:txt(c.branch||'HGAM').toUpperCase(),db:cleanDb(c.db),unitName:''}}
+async function discover(){const target=window.mxAdminTargetCfg?.();if(target?.db&&target?.branch)return{branch:txt(target.branch).toUpperCase(),db:cleanDb(target.db),unitName:txt(target.unitName||target.principalName)};const c=cfg();return{branch:txt(c.branch||'HGAM').toUpperCase(),db:cleanDb(c.db),unitName:txt(c.unitName||'')}}
 function pendingRecord(r){if(!r||typeof r!=='object')return false;const st=txt(r.status||r.estado).toLowerCase(),rt=txt(r.requestType).toLowerCase();if(/pending|pendiente|espera/.test(st)||/activation|additional_application|hard_reset_new_request/.test(rt)||txt(r.pendingAppCode))return true;return Object.values(r.applications||{}).some(a=>/pending|pendiente|espera/.test(txt(a?.status).toLowerCase())||a?.active===false)}
 async function relay(record,branchArg='',deviceArg='',reason='mirror'){if(!pendingRecord(record))return false;const d=txt(deviceArg||record.deviceKey||record.deviceId||dev()),disc=await discover(),br=txt(branchArg||disc.branch||record.branch||'HGAM').toUpperCase()||'HGAM',dk=safe(record.deviceKey||d);if(!dk)return false;const now=new Date().toISOString(),payload={status:'pending',relayVersion:2,branch:br,deviceKey:dk,deviceId:txt(record.deviceId||d),appCode:APP_CODE,viewerVersion:VERSION,githubUrl:viewerUrl(),pageHost:String(location.host||''),pagePath:String(location.pathname||''),reason,requestedAt:txt(record.lastRequestAt||record.requestedAt||now),updatedAt:now,record:{...record,branch:br,appCode:record.appCode||APP_CODE,version:record.version||VERSION,viewerUrl:viewerUrl(),githubUrl:viewerUrl(),sourceGithubUrl:viewerUrl()}};const r=await priorFetch(controlUrl('ecosystem_connection/activation_requests/'+encodeURIComponent(br)+'/'+encodeURIComponent(dk)),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),cache:'no-store'});if(!r.ok)throw new Error('Canal de activación HTTP '+r.status);try{localStorage.setItem(PENDING_KEY,String(Date.now()))}catch(_e){}return true}
 function parseBody(v){try{return typeof v==='string'?JSON.parse(v):v&&typeof v==='object'?v:null}catch(_e){return null}}
@@ -1124,10 +1124,13 @@ window.addEventListener('mx-viewer-licensed',()=>{try{localStorage.removeItem(PE
  }
  function connectionStamp(r){const t=new Date(r?.updatedAt||r?.publishedAt||r?.createdAt||0).getTime();return Number.isFinite(t)?t:0;}
  async function locate(current){
-   const dbs=[...new Set([cleanDb(current.db),...DISCOVERY_DBS].filter(Boolean))],ids=[...new Set([cleanId(current.branch),LEGACY])],candidates=[];
-   for(const db of dbs){
-     const latest=await read(db,'/ecosystem_connection/latest').catch(()=>null);if(connectionFrom(latest))candidates.push(latest);
-     for(const id of ids){const direct=await read(db,`/ecosystem_connection/${encodeURIComponent(id)}`).catch(()=>null);if(connectionFrom(direct))candidates.push(direct);const heartbeat=await read(db,`/inventory_heartbeat/${encodeURIComponent(id)}/ecosystemConnection`).catch(()=>null);if(connectionFrom(heartbeat))candidates.push(heartbeat);}
+   // El Administrador no adopta automáticamente otro sistema. El Centro de conectividad
+   // selecciona explícitamente la instalación objetivo mediante mxAdminSetTarget().
+   const id=cleanId(current.branch);if(!cleanDb(current.db)||!id||id===LEGACY)return null;
+   const candidates=[];
+   for(const db of [...new Set([cleanDb(current.db),...DISCOVERY_DBS].filter(Boolean))]){
+     const direct=await read(db,`/ecosystem_connection/${encodeURIComponent(id)}`).catch(()=>null);if(connectionFrom(direct))candidates.push(direct);
+     const heartbeat=await read(db,`/inventory_heartbeat/${encodeURIComponent(id)}/ecosystemConnection`).catch(()=>null);if(connectionFrom(heartbeat))candidates.push(heartbeat);
    }
    return candidates.sort((a,b)=>connectionStamp(b)-connectionStamp(a))[0]||null;
  }
@@ -1465,7 +1468,7 @@ function code(v){const n=txt(v).toUpperCase().replace(/^MACROXEL_/,'').replace(/
 const appLabel=c=>({TRANSFERENCIAS:'Transferencias',EXISTENCIAS:'Existencias',COLECTIVOS:'Colectivos / Pacientes',ADMINISTRADOR:'Administrador',FARMACOVIGILANCIA:'Farmacovigilancia',SURTIDO_COLECTIVOS:'Surtido colectivos',ANALISIS_SISTEMA:'Análisis sistema',FARMACIA_AJUSCO_MEDIO:'Farmacia Ajusco Medio',SISTEMA_PRINCIPAL:'Sistema Principal'}[code(c)]||txt(c)||'Visor');
 function u(path){const p=String(path||'').startsWith('/')?String(path):'/'+String(path||'');return CONTROL_DB+p+(p.endsWith('.json')?'':'.json')}
 async function req(path,opt={}){const r=await fetch(u(path)+(opt.cacheBust?'?ts='+now():''),{method:opt.method||'GET',headers:opt.body?{'Content-Type':'application/json'}:undefined,body:opt.body?JSON.stringify(opt.body):undefined,cache:'no-store'});if(!r.ok)throw new Error('Control HTTP '+r.status);return r.json().catch(()=>null)}
-const get=p=>req(p,{cacheBust:true}),patch=(p,v)=>req(p,{method:'PATCH',body:v});
+const get=p=>req(p,{cacheBust:true}),patch=(p,v)=>req(p,{method:'PATCH',body:v}),del=p=>req(p,{method:'DELETE'});
 function fmt(v){const d=new Date(v||0);return Number.isNaN(d.getTime())?'—':d.toLocaleString('es-MX',{dateStyle:'short',timeStyle:'medium'})}
 function online(r){const t=Number(r?.lastSeenMs)||Date.parse(r?.lastSeenAt||0)||0;return!!t&&now()-t<ONLINE_MS}
 function recent(r){const t=Number(r?.lastSeenMs)||Date.parse(r?.lastSeenAt||0)||0;return!!t&&now()-t<RECENT_MS}
@@ -1571,6 +1574,8 @@ function renderSystem(){
   toggle.className=allPaused?'good':'warn';
   const principalToggle=document.getElementById('mxNetTogglePrincipal');
   if(principalToggle){principalToggle.disabled=!ps.length;principalToggle.dataset.mode=pa?'connect':'disconnect';principalToggle.textContent=pa?'🔗 Conectar':'🔌 Desconectar';principalToggle.className=pa?'good':'danger';principalToggle.title=pa?'Reconectar el Sistema Principal a su URL de Firebase':'Desconectar el Sistema Principal de su URL de Firebase sin cerrar el sistema local'}
+  const deleteBtn=document.getElementById('mxNetDeleteSystem');
+  if(deleteBtn){const principalLive=ps.some(online),viewerLive=(g.viewers||[]).some(online),canDelete=!principalLive&&!viewerLive;deleteBtn.disabled=!canDelete;deleteBtn.title=canDelete?'Eliminar este registro obsoleto del Centro de conectividad. No borra inventario ni datos de trabajo.':'Solo puede eliminarse cuando el Sistema Principal y sus visores estén sin conexión.'}
   renderAudit(g)
 }
 function renderAudit(g){
@@ -1608,6 +1613,28 @@ async function togglePrincipalSelected(){
     setTimeout(load,900);
   }catch(e){alert('No se pudo '+(disconnect?'desconectar':'reconectar')+' el Sistema Principal: '+(e?.message||e))}
 }
+async function deleteSystemSelected(){
+  const g=systems().find(x=>x.branch===selectedBranch);if(!g)return;
+  const principalLive=(g.principals||[]).some(online),viewerLive=(g.viewers||[]).some(online);
+  if(principalLive||viewerLive)return alert('No se puede eliminar mientras el Sistema Principal o alguno de sus visores tenga señal activa. Desconéctalos o espera a que queden sin señal.');
+  const p=primary(g),name=p?.unitName||p?.principalName||g.branch;
+  if(!confirm(`¿Eliminar ${name} del Centro de conectividad?\n\nSe quitará únicamente su registro de esta consola y las presencias antiguas. NO se borrará inventario, pedidos, pacientes ni información de la Firebase de trabajo.\n\nSi ese Sistema Principal vuelve a conectarse, aparecerá nuevamente de forma automática.`))return;
+  const registryKeys=[...new Set((g.registry||[]).map(x=>txt(x.key)).filter(Boolean))];
+  const principalKeys=[...new Set((g.principals||[]).map(x=>txt(x.key)).filter(Boolean))];
+  const viewerKeys=[...new Set((g.viewers||[]).map(x=>txt(x.key)).filter(Boolean))];
+  const deviceKeys=[...new Set([...principalKeys,...viewerKeys])];
+  try{
+    const jobs=[];
+    for(const k of registryKeys)jobs.push(del('/ecosystem_connection/'+encodeURIComponent(k)));
+    for(const k of principalKeys)jobs.push(del('/inventory_heartbeat/principal_presence/'+encodeURIComponent(k)));
+    for(const k of viewerKeys)jobs.push(del('/inventory_heartbeat/visor_presence/'+encodeURIComponent(k)));
+    for(const k of deviceKeys){jobs.push(del('/ecosystem_connection/device_control/'+encodeURIComponent(k)));jobs.push(del('/ecosystem_connection/device_meta/'+encodeURIComponent(k)))}
+    await Promise.all(jobs);
+    await log('ELIMINAR_REGISTRO_SISTEMA',{key:g.branch,appCode:'SISTEMA_PRINCIPAL',kind:'registry',unitName:name},'Registro obsoleto eliminado desde Centro de conectividad',g.branch).catch(()=>{});
+    selectedBranch='';window.mxAdminClearTarget?.();const panel=document.getElementById('mxNetSystemPanel');if(panel)panel.hidden=true;
+    await load();
+  }catch(e){alert('No se pudo eliminar el registro del sistema: '+(e?.message||e))}
+}
 function closeSystem(){selectedBranch='';window.mxAdminClearTarget?.();const p=document.getElementById('mxNetSystemPanel');if(p)p.hidden=true;render()}
 function installLogo(){const logo=document.getElementById('mxAdminLogo');if(!logo||logo.dataset.mxConnV124==='1')return;logo.dataset.mxConnV124='1';logo.style.cursor='pointer';logo.title='Ver conexión técnica del Administrador';logo.addEventListener('click',async e=>{e.preventDefault();e.stopImmediatePropagation();let m=document.getElementById('mxAdminConnModal');if(!m){m=document.createElement('div');m.id='mxAdminConnModal';m.innerHTML='<div class="box"><div class="head"><b>Administrador · Información de conexión</b><button class="mx-admin-conn-close" type="button">Cerrar</button></div><div class="body"><div id="mxAdminConnInfo" class="mx-admin-conn-grid"></div></div></div>';document.body.appendChild(m);m.querySelector('.mx-admin-conn-close').onclick=()=>m.classList.remove('open');m.onclick=x=>{if(x.target===m)m.classList.remove('open')}}const c=window.mxViewerGetCfg?.()||{},db=clean(c.db||c.firebaseUrl||c.currentUrl||c.url),br=txt(c.branch||c.unitId||'HGAM').toUpperCase();m.querySelector('#mxAdminConnInfo').innerHTML=`<b>Estado</b><span>${navigator.onLine?'🟢 Navegador en línea':'🔴 Sin Internet'}${window.mxMaintenancePaused?.()?' · Mantenimiento':''}</span><b>URL Firebase</b><span>${esc(db||'Sin URL')}</span><b>Visor</b><span>MACROXEL Administrador</span><b>URL GitHub</b><span>${esc(window.mxViewerGitHubUrl?.()||location.href.split(/[?#]/)[0])}</span><b>Unidad</b><span>${esc(br)}</span>`;m.classList.add('open')},true)}
 function bind(){
@@ -1615,6 +1642,7 @@ function bind(){
   document.getElementById('mxNetRefresh')?.addEventListener('click',load);
   document.getElementById('mxNetToggleViewers')?.addEventListener('click',bulkSelected);
   document.getElementById('mxNetTogglePrincipal')?.addEventListener('click',togglePrincipalSelected);
+  document.getElementById('mxNetDeleteSystem')?.addEventListener('click',deleteSystemSelected);
   document.getElementById('mxNetCloseSystem')?.addEventListener('click',closeSystem);
   document.querySelector('[data-acc="conectividad"] .mx-acc-head')?.addEventListener('click',()=>setTimeout(()=>{if(!document.querySelector('[data-acc="conectividad"]')?.classList.contains('is-collapsed'))load()},80));
   load();setInterval(()=>{if(document.visibilityState==='visible'&&!document.querySelector('[data-acc="conectividad"]')?.classList.contains('is-collapsed'))load()},30000)
@@ -1735,9 +1763,14 @@ async function probe(force=false){
   const base=db();if(!base){apply(false,'Sin Firebase de trabajo configurado');return}
   probeBusy=true;try{
     const controller=new AbortController(),tm=setTimeout(()=>controller.abort(),5500);
-    let r;try{r=await fetch(base+'/ecosystem_connection/latest.json?mxprobe='+Date.now(),{cache:'no-store',signal:controller.signal})}finally{clearTimeout(tm)}
-    // 2xx = lectura efectiva. 401/403 también significan que la ruta de trabajo no es utilizable por el visor y se pinta rojo.
-    apply(!!r.ok,r.ok?'Firebase disponible':'HTTP '+r.status);
+    const ctx=window.mxAdminTargetCfg?.()||window.mxViewerGetCfg?.()||{},br=String(ctx.branch||ctx.unitId||'HGAM').trim().toUpperCase()||'HGAM',exactSelected=!!window.mxAdminTargetCfg?.();
+    let r,payload=null;try{r=await fetch(base+'/ecosystem_connection/'+encodeURIComponent(br)+'.json?mxprobe='+Date.now(),{cache:'no-store',signal:controller.signal});if(r.ok)payload=await r.clone().json().catch(()=>null)}finally{clearTimeout(tm)}
+    if(!exactSelected){apply(!!r.ok,r.ok?'Firebase del Administrador disponible':'HTTP '+r.status);return}
+    // Con un sistema seleccionado usamos el mismo criterio de los demás visores: registro exacto + señal reciente del Principal.
+    let presence=null;try{const pr=await fetch('https://ecosistema-macroxel-default-rtdb.firebaseio.com/inventory_heartbeat/principal_presence.json?mxprobe='+Date.now(),{cache:'no-store'});if(pr.ok)presence=await pr.json().catch(()=>null)}catch(_e){}
+    let last=0,paused=false;for(const row of Object.values(presence||{})){const rb=String(row?.branch||row?.unitId||'').trim().toUpperCase();if(rb!==br)continue;const ts=Number(row?.lastSeenMs)||Date.parse(row?.lastSeenAt||0)||0;if(ts>last){last=ts;paused=row?.connectionPaused===true}}
+    const principalOnline=!!last&&(Date.now()-last)<95000&&!paused,ok=!!r.ok&&!!payload&&principalOnline;
+    apply(ok,ok?'Conectado a '+br:paused?'Sistema '+br+' desconectado':(!payload?'Sin registro de '+br:'Sistema '+br+' sin señal reciente'));
   }catch(e){apply(false,e?.name==='AbortError'?'Tiempo de espera agotado':String(e?.message||e))}finally{probeBusy=false}
 }
 function boot(){
