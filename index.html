@@ -403,15 +403,14 @@ input,select,textarea{color:#102844!important;background:#fff!important;border-c
 <div id="mxNetSystems" class="mx-net-systems"><div class="mx-net-empty">Buscando Sistemas Principales…</div></div>
 <div id="mxNetSystemPanel" class="mx-net-system-panel" hidden>
   <div class="mx-net-system-head">
-    <div><span class="mx-net-eyebrow">SISTEMA SELECCIONADO</span><h4 id="mxNetSystemTitle">Sistema Principal</h4><div id="mxNetSystemState" class="mx-net-state"></div><div id="mxNetAdminLink" class="mx-net-linked"></div></div>
+    <div><h4 id="mxNetSystemTitle">Sistema Principal</h4><div id="mxNetSystemState" class="mx-net-state"></div><div id="mxNetAdminLink" class="mx-net-linked"></div></div>
     <div class="mx-net-system-head-actions"><button id="mxNetToggleViewers" class="warn" type="button">🛠 Pausar visores</button><button id="mxNetTogglePrincipal" class="danger" type="button">🔌 Desconectar</button><button id="mxNetDeleteSystem" class="danger" type="button">🗑 Eliminar sistema</button><button id="mxNetCloseSystem" class="secondary" type="button">Cerrar</button></div>
   </div>
   <div class="mx-net-system-grid">
-    <div class="mx-net-panel"><h4>Información del Sistema Principal</h4><div id="mxNetPrincipalInfo" class="mx-net-info"></div></div>
+    <div id="mxNetPrincipalInfo" hidden></div>
     <div class="mx-net-panel"><h4>Rutas</h4><div id="mxNetRoutesInfo" class="mx-net-routes"></div></div>
   </div>
   <div class="mx-net-panel"><h4>Visores conectados</h4><div id="mxNetViewerList" class="mx-net-viewer-list"></div></div>
-  <details class="mx-net-audit-box"><summary>Auditoría de conexión</summary><div id="mxNetAudit" class="mx-net-audit"><div class="mx-net-audit-item">Sin eventos todavía.</div></div></details>
 </div>
 </div></div></section>
 
@@ -1474,7 +1473,7 @@ function online(r){const t=Number(r?.lastSeenMs)||Date.parse(r?.lastSeenAt||0)||
 function recent(r){const t=Number(r?.lastSeenMs)||Date.parse(r?.lastSeenAt||0)||0;return!!t&&now()-t<RECENT_MS}
 function branchOf(r){return txt(r?.branch||r?.unitId||'SIN_UNIDAD').toUpperCase()||'SIN_UNIDAD'}
 function unitNameOf(r){return txt(r?.unitName||r?.principalName||r?.branch||'Sistema Principal')}
-let principals=[],viewers=[],controls={},meta={},audit=[],registry={},selectedBranch=window.mxAdminTargetCfg?.()?.branch||'';
+let principals=[],viewers=[],controls={},meta={},audit=[],registry={},selectedBranch='';
 function ctl(d){return controls?.[d?.key]||{}}
 function paused(d){return ctl(d)?.paused===true||d?.connectionPaused===true}
 function principalRemotePaused(d){return ctl(d)?.paused===true}
@@ -1864,5 +1863,86 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 })();
 
 </script>
+
+<style id="mx-admin-system-workspace-v100-style">
+/* MACROXEL v1.0.00 · Administrador por Sistema Principal */
+body:not(.mx-admin-has-target) main.wrap > .mx-acc-card:not([data-acc="conectividad"]),
+body:not(.mx-admin-has-target) main.wrap > section:not([data-acc="conectividad"]),
+body:not(.mx-admin-has-target) main.wrap > div.footer-note{display:none!important}
+#mxConnectivityCenter{display:block!important;margin-top:10px!important}
+#mxConnectivityCenter>.mx-acc-head{display:none!important}
+#mxConnectivityCenter>.mx-acc-body{display:block!important;padding:14px!important}
+#mxConnectivityCenter>.mx-acc-body>.sub{font-size:11px!important;margin-bottom:10px!important;color:#55708b!important}
+.mx-net-toolbar{margin-bottom:8px!important}.mx-net-toolbar #mxNetRefresh{display:none!important}
+.mx-net-systems{grid-template-columns:repeat(auto-fit,minmax(235px,1fr))!important;gap:8px!important}
+.mx-net-system-btn{padding:11px 12px!important;border-radius:12px!important;min-height:66px!important;text-align:left!important}
+.mx-net-system-btn b{font-size:12px!important}.mx-net-system-btn small{font-size:9.5px!important;line-height:1.35!important;margin-top:4px!important}
+body.mx-admin-has-target #mxNetSystems,body.mx-admin-has-target .mx-net-toolbar,body.mx-admin-has-target #mxConnectivityCenter>.mx-acc-body>.sub{display:none!important}
+#mxNetSystemPanel{margin-top:0!important;padding:10px!important;border-radius:14px!important;background:#f8fbff!important}
+.mx-net-system-head{padding:0!important;align-items:center!important;gap:8px!important}
+.mx-net-system-head h4{font-size:15px!important;margin:0!important}.mx-net-system-head .mx-net-eyebrow,#mxNetAdminLink{display:none!important}
+#mxNetSystemState{font-size:10px!important;margin-top:3px!important}
+.mx-net-system-head-actions{gap:5px!important;flex-wrap:wrap!important}.mx-net-system-head-actions button{padding:7px 9px!important;font-size:10px!important;border-radius:9px!important}
+#mxNetCloseSystem{order:-1!important;background:#eaf2fb!important;color:#173d63!important;border:1px solid #cbdced!important}
+.mx-admin-conn-details{margin-top:9px;border:1px solid #d9e6f3;border-radius:11px;background:#fff;overflow:hidden}
+.mx-admin-conn-details>summary{cursor:pointer;list-style:none;padding:9px 11px;font-size:11px;font-weight:900;color:#153c63;display:flex;align-items:center;justify-content:space-between}
+.mx-admin-conn-details>summary::-webkit-details-marker{display:none}.mx-admin-conn-details>summary:after{content:'+';font-size:16px}.mx-admin-conn-details[open]>summary:after{content:'−'}
+.mx-admin-conn-details-body{padding:0 9px 9px}.mx-admin-conn-details .mx-net-panel{padding:8px!important;margin-top:6px!important;border-radius:9px!important}.mx-admin-conn-details .mx-net-panel h4{font-size:10px!important;margin:0 0 5px!important}
+#mxAdminWorkspaceTitle{display:none;margin:10px 0 4px;padding:9px 12px;border-radius:12px;background:linear-gradient(135deg,#092f55,#0c669a);color:#fff;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 7px 18px rgba(15,60,95,.12)}
+body.mx-admin-has-target #mxAdminWorkspaceTitle{display:flex}#mxAdminWorkspaceTitle b{font-size:12px}#mxAdminWorkspaceTitle small{display:block;opacity:.82;font-size:9px;margin-top:2px}
+body.mx-admin-has-target main.wrap .mx-acc-card:not([data-acc="conectividad"]){display:block!important;margin:7px 0!important;border-radius:12px!important}
+body.mx-admin-has-target main.wrap .mx-acc-card:not([data-acc="conectividad"])>.mx-acc-head{min-height:48px!important;padding:9px 12px!important}
+body.mx-admin-has-target main.wrap .mx-acc-card:not([data-acc="conectividad"])>.mx-acc-head .title{font-size:13px!important}
+body.mx-admin-has-target main.wrap .mx-acc-card:not([data-acc="conectividad"])>.mx-acc-head .mx-acc-toggle{font-size:10px!important;padding:6px 9px!important}
+body.mx-admin-has-target main.wrap .mx-acc-card:not([data-acc="conectividad"])>.mx-acc-body{padding:10px 12px!important}
+body.mx-admin-has-target .mx-acc-body .sub{font-size:10px!important;line-height:1.35!important;margin-bottom:8px!important}
+/* información repetida y controles manuales que ya no aportan en el flujo por sistema */
+#mxNetPrincipalInfo{display:none!important}#mxNetPrincipalInfo.closest{display:none!important}
+.mx-net-audit-box,#mxNetAudit{display:none!important}
+#refreshBtn,#vlaRefresh,#mxIdRefresh{display:none!important}
+@media(max-width:700px){.mx-net-systems{grid-template-columns:1fr!important}.mx-net-system-head{align-items:flex-start!important;flex-direction:column!important}.mx-net-system-head-actions{width:100%}.mx-net-system-head-actions button{flex:1 1 auto!important}#mxAdminWorkspaceTitle{align-items:flex-start;flex-direction:column}}
+</style>
+<script id="mx-admin-system-workspace-v100">
+(function(){
+'use strict';if(window.__mxAdminSystemWorkspaceV100)return;window.__mxAdminSystemWorkspaceV100=true;
+const $=id=>document.getElementById(id),txt=v=>String(v==null?'':v).trim();
+function target(){try{return window.mxAdminTargetCfg?.()||null}catch(_e){return null}}
+function setCollapsed(card,yes=true){if(!card)return;card.classList.toggle('is-collapsed',!!yes);const b=card.querySelector('.mx-acc-toggle');if(b)b.textContent=yes?'Abrir':'Minimizar'}
+function operationalCards(){return [...document.querySelectorAll('main.wrap > .mx-acc-card')].filter(c=>c.dataset.acc!=='conectividad')}
+function clearOperationalViews(){
+ const body=$('vlaBody');if(body)body.innerHTML='<tr><td colspan="6" class="empty">Selecciona un Sistema Principal para consultar sus activaciones.</td></tr>';
+ const users=$('activeUsers');if(users)users.innerHTML='<div class="empty">Selecciona un Sistema Principal.</div>';
+ const dl=$('usersList');if(dl)dl.innerHTML='';
+}
+function compactConnectivity(){
+ const panel=$('mxNetSystemPanel');if(!panel||panel.dataset.mxWorkspaceCompact==='1')return;panel.dataset.mxWorkspaceCompact='1';
+ const close=$('mxNetCloseSystem');if(close){close.textContent='← Cambiar sistema';close.title='Volver a la lista de Sistemas Principales'}
+ const grid=panel.querySelector('.mx-net-system-grid');const viewer=$('mxNetViewerList')?.closest('.mx-net-panel');
+ let routePanel=$('mxNetRoutesInfo')?.closest('.mx-net-panel');
+ // La tarjeta de información general repite nombre, ID y estado ya visibles arriba; se elimina.
+ const info=$('mxNetPrincipalInfo')?.closest('.mx-net-panel');if(info)info.remove();
+ if(grid&&routePanel){routePanel.remove();if(!grid.children.length)grid.remove()}
+ const d=document.createElement('details');d.className='mx-admin-conn-details';d.innerHTML='<summary>Conectividad, rutas y visores</summary><div class="mx-admin-conn-details-body"></div>';const body=d.querySelector('.mx-admin-conn-details-body');
+ if(routePanel)body.appendChild(routePanel);if(viewer)body.appendChild(viewer);panel.appendChild(d);
+}
+function ensureWorkspaceTitle(){
+ let el=$('mxAdminWorkspaceTitle');if(el)return el;el=document.createElement('div');el.id='mxAdminWorkspaceTitle';const conn=$('mxConnectivityCenter');conn?.insertAdjacentElement('afterend',el);return el;
+}
+function sync(){
+ compactConnectivity();const t=target(),has=!!(t?.db&&t?.branch);document.body.classList.toggle('mx-admin-has-target',has);
+ const title=ensureWorkspaceTitle();
+ if(has){title.innerHTML=`<div><b>Administrando: ${txt(t.unitName||t.branch)}</b><small>ID ${txt(t.branch)} · Los módulos siguientes pertenecen únicamente a este sistema.</small></div><span>Selección activa</span>`;operationalCards().forEach(c=>setCollapsed(c,true));}
+ else{title.innerHTML='';clearOperationalViews();operationalCards().forEach(c=>setCollapsed(c,true));const p=$('mxNetSystemPanel');if(p)p.hidden=true;}
+}
+function guard(){document.addEventListener('click',e=>{const head=e.target.closest?.('main.wrap > .mx-acc-card:not([data-acc="conectividad"]) .mx-acc-head');if(!head)return;if(target())return;e.preventDefault();e.stopImmediatePropagation();alert('Selecciona primero un Sistema Principal. Las activaciones, usuarios, permisos y mensajes se administran por instalación.');},true)}
+function init(){try{window.mxAdminClearTarget?.()}catch(_e){};compactConnectivity();ensureWorkspaceTitle();guard();sync();window.addEventListener('mx-admin-target-changed',()=>setTimeout(sync,20));
+ const close=$('mxNetCloseSystem');if(close)close.addEventListener('click',()=>setTimeout(sync,10));
+ // Centro de conectividad abierto desde el inicio para que la primera pantalla sea la lista de sistemas.
+ const c=$('mxConnectivityCenter');if(c){c.classList.remove('is-collapsed');const body=c.querySelector('.mx-acc-body');if(body)body.style.display='block'}
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
+</script>
+
 </body>
 </html>
